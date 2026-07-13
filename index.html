@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enclave — Local Meeting Summarizer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================================
+       Design tokens
+       ============================================================================ */
+    :root {
+      --bg: #10121a;
+      --surface: #171a24;
+      --surface-raised: #1d2130;
+      --border: #262b3a;
+      --border-soft: #1f2330;
+
+      --text: #eef1f7;
+      --text-muted: #9da2b1;
+      --text-faint: #d5d8e2;
+
+      --accent: #ffb238;      /* signal amber — record light */
+      --accent-soft: #ffb23822;
+      --accent-2: #2dd4bf;    /* teal — done / success */
+      --error: #ff6b6b;
+      --error-soft: #ff6b6b1a;
+
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 64px 20px 80px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* subtle grain so the flat dark bg doesn't feel dead */
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 620px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent), #ff7a38);
+    }
+
+    .brand-name {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 100px;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 8px var(--accent-2);
+    }
+
+    /* Hero */
+    .hero { margin-bottom: 30px; }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: 40px;
+      line-height: 1.15;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 14px;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin: 0;
+      max-width: 46ch;
+    }
+
+    /* Card / dropzone */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .dropzone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .dropzone.has-file {
+      border-style: solid;
+      border-color: var(--accent-2);
+    }
+
+    .dropzone-title {
+      font-size: 15px;
+      font-weight: 500;
+      margin: 18px 0 4px;
+    }
+
+    .dropzone-hint {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+      margin: 0;
+    }
+
+    /* waveform: idle decoration + active processing indicator */
+    .waveform {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 28px;
+    }
+
+    .waveform span {
+      width: 3px;
+      border-radius: 2px;
+      background: var(--text-faint);
+      height: 30%;
+      transition: background 0.2s ease;
+    }
+
+    .waveform span:nth-child(1) { height: 40%; }
+    .waveform span:nth-child(2) { height: 65%; }
+    .waveform span:nth-child(3) { height: 30%; }
+    .waveform span:nth-child(4) { height: 85%; }
+    .waveform span:nth-child(5) { height: 50%; }
+    .waveform span:nth-child(6) { height: 70%; }
+    .waveform span:nth-child(7) { height: 35%; }
+    .waveform span:nth-child(8) { height: 90%; }
+    .waveform span:nth-child(9) { height: 45%; }
+    .waveform span:nth-child(10) { height: 60%; }
+
+    .waveform.processing span {
+      background: var(--accent);
+      animation: pulse 1.1s ease-in-out infinite;
+    }
+
+    .waveform.processing span:nth-child(2n) { animation-delay: 0.1s; }
+    .waveform.processing span:nth-child(3n) { animation-delay: 0.2s; }
+    .waveform.processing span:nth-child(4n) { animation-delay: 0.3s; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scaleY(0.4); opacity: 0.6; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    /* Button */
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: #1a1200;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background: #ffc158;
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) { transform: translateY(0); }
+
+    button:disabled {
+      background: var(--border);
+      color: var(--text-faint);
+      cursor: not-allowed;
+    }
+
+    /* Status / error rows */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 22px;
+      padding: 14px 16px;
+      background: var(--surface-raised);
+      border-radius: var(--radius-sm);
+    }
+
+    .status-row .waveform { height: 18px; flex-shrink: 0; }
+    .status-row .waveform span { width: 2.5px; }
+
+    #statusText {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .error-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-top: 22px;
+      padding: 14px 16px;
+      background: var(--error-soft);
+      border: 1px solid var(--error);
+      border-radius: var(--radius-sm);
+    }
+
+    .error-icon {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--error);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #errorText {
+      font-size: 13.5px;
+      color: var(--error);
+      line-height: 1.5;
+    }
+
+    /* Result */
+    .result {
+      margin-top: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      animation: rise 0.35s ease;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .result-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+    }
+
+    .result-file {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    .summary-text {
+      white-space: pre-wrap;
+      line-height: 1.75;
+      font-size: 14.5px;
+      color: var(--text);
+    }
+
+    .transcript {
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .transcript summary {
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text-muted);
+      list-style: none;
+    }
+
+    .transcript summary::-webkit-details-marker { display: none; }
+    .transcript summary::before { content: "+ "; color: var(--accent); }
+    .transcript[open] summary::before { content: "− "; }
+
+    #transcriptText {
+      white-space: pre-wrap;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--text-faint);
+      margin: 14px 0 0;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 30px; }
+      .card, .result { padding: 20px; }
+      body { padding: 40px 16px 60px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .waveform.processing span { animation: none; }
+      .result { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="noise"></div>
+
+  <main class="shell">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">Enclave</span>
+      </div>
+      <span class="badge">
+        <span class="badge-dot"></span>
+        Running fully local
+      </span>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Turn a recording into<br /><em>a decision log.</em></h1>
+      <p class="hero-sub">Drop in the audio. Whisper transcribes it, your local model reads it — nothing leaves this machine.</p>
+    </section>
+
+    <!-- Upload card -->
+    <section class="card">
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg" hidden />
+
+        <div class="waveform" id="idleWaveform" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <p class="dropzone-title" id="dropzoneTitle">Drag in a recording, or click to browse</p>
+        <p class="dropzone-hint" id="dropzoneHint">MP3, WAV, M4A, WEBM — up to 200MB</p>
+      </div>
+
+      <button id="summarizeBtn" disabled>
+        <span id="btnLabel">Select a file to begin</span>
+      </button>
+
+      <!-- Processing state -->
+      <div id="statusBox" class="status-row hidden">
+        <div class="waveform processing" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <span id="statusText">Transcribing audio…</span>
+      </div>
+
+      <!-- Error state -->
+      <div id="errorBox" class="error-row hidden">
+        <span class="error-icon">!</span>
+        <span id="errorText"></span>
+      </div>
+
+    </section>
+
+    <!-- Result -->
+    <section id="resultBox" class="result hidden">
+      <div class="result-header">
+        <span class="result-eyebrow">Summary</span>
+        <span id="resultFileName" class="result-file"></span>
+      </div>
+
+      <div id="summaryText" class="summary-text"></div>
+
+      <details class="transcript">
+        <summary>Full transcript</summary>
+        <p id="transcriptText"></p>
+      </details>
+    </section>
+
+  </main>
+
+  <script>
+    // Backend URL — change the port here if you run FastAPI elsewhere
+    const API_URL = "http://localhost:8000/summarize";
+
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const dropzoneTitle = document.getElementById("dropzoneTitle");
+    const dropzoneHint = document.getElementById("dropzoneHint");
+
+    const summarizeBtn = document.getElementById("summarizeBtn");
+    const btnLabel = document.getElementById("btnLabel");
+
+    const statusBox = document.getElementById("statusBox");
+    const statusText = document.getElementById("statusText");
+
+    const errorBox = document.getElementById("errorBox");
+    const errorText = document.getElementById("errorText");
+
+    const resultBox = document.getElementById("resultBox");
+    const resultFileName = document.getElementById("resultFileName");
+    const summaryTextEl = document.getElementById("summaryText");
+    const transcriptTextEl = document.getElementById("transcriptText");
+
+    let selectedFile = null;
+
+    dropzone.addEventListener("click", () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length > 0) {
+        handleFileSelected(fileInput.files[0]);
+      }
+    });
+
+    // Drag & drop support
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault(); // required or drop won't fire
+      dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelected(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Shared handler for both click-to-browse and drag & drop
+    function handleFileSelected(file) {
+      selectedFile = file;
+
+      dropzone.classList.add("has-file");
+      dropzoneTitle.textContent = file.name;
+      dropzoneHint.textContent = `${(file.size / (1024 * 1024)).toFixed(1)} MB — click to change`;
+
+      btnLabel.textContent = "Summarize meeting";
+      summarizeBtn.disabled = false;
+
+      hideError();
+      hideResult();
+    }
+
+    summarizeBtn.addEventListener("click", async () => {
+      if (!selectedFile) return;
+
+      hideError();
+      hideResult();
+      showStatus("Transcribing audio…");
+      summarizeBtn.disabled = true;
+
+      try {
+        // FormData is required for file uploads via fetch (multipart/form-data)
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        const response = await fetch(API_URL, {
+          method: "POST",
+          body: formData,
+          // Content-Type is set automatically by the browser for FormData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server error (${response.status})`);
+        }
+
+        const data = await response.json();
+        showResult(data.filename, data.summary, data.transcript);
+
+      } catch (err) {
+        showError(err.message || "Something went wrong. Is the backend running?");
+
+      } finally {
+        hideStatus();
+        summarizeBtn.disabled = false;
+      }
+    });
+
+    function showStatus(text) {
+      statusText.textContent = text;
+      statusBox.classList.remove("hidden");
+    }
+
+    function hideStatus() {
+      statusBox.classList.add("hidden");
+    }
+
+    function showError(message) {
+      errorText.textContent = message;
+      errorBox.classList.remove("hidden");
+    }
+
+    function hideError() {
+      errorBox.classList.add("hidden");
+      errorText.textContent = "";
+    }
+
+    function showResult(filename, summary, transcript) {
+      resultFileName.textContent = filename;
+      summaryTextEl.textContent = summary;
+      transcriptTextEl.textContent = transcript;
+      resultBox.classList.remove("hidden");
+    }
+
+    function hideResult() {
+      resultBox.classList.add("hidden");
+    }
+  </script>
+
+</body>
+</html>
