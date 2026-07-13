@@ -72,4 +72,3 @@ Just open `index.html` directly in your browser — no build step required.
 =====================================
 
 Built by Reoof Abahussain ★
-Built by Reoof Abahussain ★
