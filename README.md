@@ -4,7 +4,7 @@
 
 Enclave summarizes meetings entirely offline, transcription and AI summarization both run locally, with nothing sent to the cloud, designed for Saudi government organizations and any organization that requires full data privacy
 
-Screenshots
+## Screenshots
 
 ![Main Interface](screenshot.png)
 
