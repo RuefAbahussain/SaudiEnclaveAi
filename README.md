@@ -20,7 +20,7 @@ Enclave summarizes meetings entirely offline, transcription and AI summarization
 
 - Backend: FastAPI (Python)
 - Speech-to-Text: OpenAI Whisper (local, base model)
-- Summarization: Ollama (e.g. `llama3.1`) via LiteLLM
+- Summarization: Ollama (e.g. `qwen2.5:3b`) via LiteLLM
 - Frontend: Single-file HTML, CSS & vanilla JavaScript
 
 =====================================
@@ -37,7 +37,7 @@ Enclave summarizes meetings entirely offline, transcription and AI summarization
 - **Ollama** installed and running with a model pulled:
   ```bash
   ollama serve
-  ollama pull llama3.1
+  ollama run qwen2.5:3b
   ```
 
 ### 2. Run the backend
@@ -61,4 +61,11 @@ Just open `index.html` directly in your browser — no build step required.
 
 =====================================
 
+## Known Issues
+
+- Performance depends heavily on your GPU: If your GPU has low VRAM, model performance will be weak — summarization can take several minutes for a full meeting, and larger models may not run at a usable speed at all, Prefer smaller models (e.g. `qwen2.5:0.5b`–`3b`) on modest hardware.
+
+=====================================
+
+Built by Reoof Abahussain ★
 Built by Reoof Abahussain ★
