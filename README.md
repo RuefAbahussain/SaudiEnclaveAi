@@ -6,7 +6,7 @@ Enclave summarizes meetings entirely offline, transcription and AI summarization
 
 ## Screenshots
 
-![Main Interface](screenshot.png)
+![Main Interface](screenshot.jpeg)
 
 =====================================
 
